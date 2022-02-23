@@ -9,11 +9,13 @@ import math
 import streamlit
 import keplergl
 import pandas as pd
-import gpx_parser
 import gpxpy 
 import gpxpy.gpx 
 import matplotlib as plt
 import numpy as np
+from streamlit_folium import folium_static
+import folium
+from collections import namedtuple
 
 R = 6371000
 def haversine(c1, c2):
@@ -29,28 +31,35 @@ def haversine(c1, c2):
           )
     return 2*R*math.asin(math.sqrt(el))
 
-fi = '/Users/Louis/GitHub/ProjetsPublic/Fluid BikeMap/exemple-de-trace-gps.gpx'
+def map_folium(file):
+    gpx = gpxpy.parse(file)
+    points = []
+    for track in gpx.tracks:
+        for segment in track.segments:
+            for point in segment.points:
+                points.append(tuple([point.latitude,point.longitude]))
+    ave_lat = sum(p[0] for p in points)/len(points)
+    ave_lon = sum(p[1] for p in points)/len(points)
 
-
-from collections import namedtuple
-
-GpxPoint = namedtuple(
-    "GpxPoint", ["time", "distance", "tot_dist", "speed", "coordinates"]
-)
+    my_map = folium.Map(location=[ave_lat, ave_lon], zoom_start=14)
+    for each in points:  
+        folium.Marker(each).add_to(my_map)
+    folium.PolyLine(points, color="red", weight=2.5, opacity=1).add_to(my_map)
+    folium_static(my_map)
 
 
 def liregpx(file_name):
-    with open(file_name, "r") as gpx_file:
-        gpx = gpx_parser.parse(gpx_file)
+    GpxPoint = namedtuple("GpxPoint", ["time", "distance", "tot_dist", "speed", "coordinates"])
+    gpx = gpxpy.parse(file_name)
 
     tab = []
 
-    for track in gpx:
-        for segment in track:
+    for track in gpx.tracks:
+        for segment in track.segments:
             previous_point = None
             t = 0
             total_distance = 0
-            for point in segment:
+            for point in segment.points:
                 if previous_point is not None:
                     distance = haversine(
                         (previous_point.latitude, previous_point.longitude),
@@ -76,7 +85,6 @@ def liregpx(file_name):
 
     return tab
 
-fi2= liregpx(fi)
 vitesse_min= 5
 
 def score(points):
